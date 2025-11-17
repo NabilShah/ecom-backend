@@ -9,8 +9,8 @@ const {
 } = require("../controllers/adminController");
 
 // Admin-only routes
-router.post("/product", auth, role("admin"), createProduct);
-router.put("/product/:id", auth, role("admin"), updateProduct);
-router.delete("/product/:id", auth, role("admin"), deleteProduct);
+router.post("/createProduct", auth, role("admin"), createProduct);
+router.put("/updateProduct/:id", auth, role("admin"), updateProduct);
+router.delete("/deleteProduct/:id", auth, role("admin"), deleteProduct);
 
 module.exports = router;
