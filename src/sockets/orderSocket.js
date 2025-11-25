@@ -77,4 +77,35 @@ module.exports = (socket, io) => {
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
   });
+  // ===============================
+// PRODUCT EVENTS
+// ===============================
+
+// Product Created
+socket.on("productCreated", (product) => {
+  console.log("Product Created:", product._id);
+
+  // Notify all customers
+  io.emit("productCreated", product);
+
+  // Notify admin room also if needed
+  io.to("admin").emit("productCreated", product);
+});
+
+// Product Updated
+socket.on("productUpdated", (product) => {
+  console.log("Product Updated:", product._id);
+
+  io.emit("productUpdated", product);     // all customers
+  io.to("admin").emit("productUpdated", product);
+});
+
+// Product Deleted
+socket.on("productDeleted", (productId) => {
+  console.log("Product Deleted:", productId);
+
+  io.emit("productDeleted", productId);   // all customers
+  io.to("admin").emit("productDeleted", productId);
+});
+
 };

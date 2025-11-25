@@ -17,6 +17,8 @@ exports.createProduct = async (req, res) => {
       stock,
     });
 
+    req.app.get("io").emit("productCreated", product);
+
     res.json({
       message: "Product created successfully",
       product,
@@ -39,6 +41,14 @@ exports.updateProduct = async (req, res) => {
     if (!updated)
       return res.status(404).json({ message: "Product not found" });
 
+    req.app.get("io").emit("productUpdated", updated);
+
+    // ALSO update stock UI live
+    req.app.get("io").emit("stockUpdated", {
+      productId: updated._id,
+      stock: updated.stock,
+    });
+
     res.json({
       message: "Product updated successfully",
       product: updated,
@@ -60,6 +70,8 @@ exports.deleteProduct = async (req, res) => {
 
     if (!deleted)
       return res.status(404).json({ message: "Product not found" });
+
+    req.app.get("io").emit("productDeleted", id);
 
     res.json({ message: "Product deleted successfully" });
 

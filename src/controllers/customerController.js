@@ -37,27 +37,62 @@ exports.getProductById = async (req, res) => {
 exports.placeOrder = async (req, res) => {
   try {
     const customerId = req.user.id;
-    const { items } = req.body;
+    const { items, shipping, paymentMethod } = req.body;
 
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Items cannot be empty" });
 
-    // Calculate total
-    let total = 0;
-    for (let item of items) {
-      total += item.price * item.qty;
+    // 1️⃣ Validate stock & subtract
+    let totalProductPrice = 0;
+    let updatedProducts = [];
+
+    for (const item of items) {
+      const product = await Product.findById(item.product);
+
+      if (!product)
+        return res.status(404).json({ message: `Product not found: ${item.product}` });
+
+      if (product.stock < item.qty)
+        return res.status(400).json({
+          message: `Not enough stock for ${product.name}, available: ${product.stock}`
+        });
+
+      // subtract stock
+      product.stock -= item.qty;
+      await product.save();
+
+      updatedProducts.push(product);
+
+      totalProductPrice += item.price * item.qty;
     }
 
+    // 2️⃣ Extra charges
+    const deliveryCharge = 40;
+    const tax = Number((totalProductPrice * 0.05).toFixed(2));
+
+    const finalTotal = totalProductPrice + deliveryCharge + tax;
+
+    // 3️⃣ Create order
     const order = await Order.create({
       customer: customerId,
       items,
-      total,
+      total: finalTotal,
+      shipping,
+      paymentMethod,
       status: "unassigned"
     });
 
-    // Emit event to delivery partners
+    // 4️⃣ Emit to delivery partners
     const io = req.app.get("io");
     io.to("delivery-available").emit("newOrder", order);
+
+    // 5️⃣ Emit updated stock to ALL customers
+    updatedProducts.forEach((product) => {
+      io.emit("stockUpdated", {
+        productId: product._id,
+        stock: product.stock
+      });
+    });
 
     res.json({
       message: "Order placed successfully",
@@ -65,6 +100,7 @@ exports.placeOrder = async (req, res) => {
     });
 
   } catch (err) {
+    console.error("Order error:", err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -11,6 +11,18 @@ const OrderSchema = new mongoose.Schema({
     },
   ],
 
+  shipping: {
+    address: String,
+    city: String,
+    pin: String,
+  },
+
+  paymentMethod: {
+    type: String,
+    enum: ["cod", "card", "upi"],
+    default: "cod"
+  },
+
   total: Number,
   
   status: {

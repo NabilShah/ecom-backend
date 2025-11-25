@@ -8,7 +8,7 @@ exports.getUnassignedOrders = async (req, res) => {
   try {
     const orders = await Order.find({ status: "unassigned" })
       .sort({ createdAt: -1 })
-      .populate("customer", "name phone");
+      .populate("customer", "name email");
 
     res.json(orders);
 
