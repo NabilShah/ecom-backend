@@ -62,34 +62,37 @@ const users = [
   },
 ];
 
-async function hashUserPasswords() {
-  const hashed = [];
-
-  for (let u of users) {
-    const hashedPass = await bcrypt.hash(u.password, 10);
-    hashed.push({ ...u, password: hashedPass });
-  }
-
-  return hashed;
+async function hashPassword(rawPassword) {
+  return await bcrypt.hash(rawPassword, 10);
 }
 
 async function seed() {
   try {
-    // Clear existing data (optional)
-    await Product.deleteMany({});
-    await User.deleteMany({});
+    for (let p of products) {
+      const exists = await Product.findOne({ name: p.name });
 
-    // Insert Products
-    await Product.insertMany(products);
-    console.log("Products inserted successfully");
+      if (exists) {
+        console.log(`Product already exists → ${p.name} (skipped)`);
+      } else {
+        await Product.create(p);
+        console.log(`Inserted Product → ${p.name}`);
+      }
+    }
 
-    // Insert Users with hashed passwords
-    const finalUsers = await hashUserPasswords();
-    await User.insertMany(finalUsers);
-    console.log("Users inserted successfully");
+    for (let u of users) {
+      const exists = await User.findOne({ email: u.email });
+
+      if (exists) {
+        console.log(`User already exists → ${u.email} (skipped)`);
+      } else {
+        const hashed = await hashPassword(u.password);
+        await User.create({ ...u, password: hashed });
+        console.log(`Inserted User → ${u.email}`);
+      }
+    }
 
     mongoose.connection.close();
-    console.log("Database connection closed");
+    console.log("Seeding Completed & DB Connection Closed");
   } catch (err) {
     console.log("Seeding Error:", err);
     mongoose.connection.close();
