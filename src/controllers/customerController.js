@@ -84,7 +84,14 @@ exports.placeOrder = async (req, res) => {
 
     // 4️⃣ Emit to delivery partners
     const io = req.app.get("io");
-    io.to("delivery-available").emit("newOrder", order);
+
+    // Populate before emitting so admin UI has full info
+    const populatedOrder = await Order.findById(order._id)
+      .populate("customer", "name email phone")
+      .populate("assignedTo", "name email phone");
+
+    io.to("delivery-available").emit("newOrder", populatedOrder);
+    io.to("admin").emit("newOrder", populatedOrder);
 
     // 5️⃣ Emit updated stock to ALL customers
     updatedProducts.forEach((product) => {
@@ -133,7 +140,7 @@ exports.getOrderById = async (req, res) => {
       customer: req.user.id
     })
       .populate("items.product", "name price")
-      .populate("assignedTo", "name phone");
+      .populate("assignedTo", "name phone email");
 
     if (!order)
       return res.status(404).json({ message: "Order not found" });
@@ -141,6 +148,73 @@ exports.getOrderById = async (req, res) => {
     res.json(order);
 
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+// -------------------------------
+// CANCEL ORDER
+// -------------------------------
+exports.cancelOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+
+    // Find order
+    const order = await Order.findOne({
+      _id: orderId,
+      customer: req.user.id
+    }).populate("items.product");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Only allow cancel if not delivered
+    if (["delivered", "cancelled"].includes(order.status)) {
+      return res.status(400).json({ message: "Order cannot be cancelled" });
+    }
+
+    // Restore stock
+    for (const item of order.items) {
+      const product = await Product.findById(item.product._id);
+      product.stock += item.qty;
+      await product.save();
+    }
+
+    // Update order status
+    order.status = "cancelled";
+    await order.save();
+
+    // Emit stock updated + order updated
+    const io = req.app.get("io");
+
+    // Re-fetch populated for UI
+    const populated = await Order.findById(order._id)
+      .populate("customer", "name email phone")
+      .populate("assignedTo", "name email phone");
+
+    // Notify customer
+    io.to(`customer:${order.customer.toString()}`).emit("orderUpdated", populated);
+
+    // Notify admin
+    io.to("admin").emit("orderUpdated", populated);
+    io.to("delivery-available").emit("orderUpdated", populated);   // 👈 NEW
+    io.emit("orderUpdated", populated);
+
+    // Stock updates
+    order.items.forEach((item) => {
+      io.emit("stockUpdated", {
+        productId: item.product._id,
+        stock: item.product.stock
+      });
+    });
+
+    return res.json({
+      message: "Order cancelled successfully",
+      order
+    });
+
+  } catch (err) {
+    console.error("Cancel error:", err);
     res.status(500).json({ error: err.message });
   }
 };

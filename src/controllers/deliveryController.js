@@ -48,13 +48,18 @@ exports.acceptOrder = async (req, res) => {
     // Emit event to:
     // - Customer
     // - Admin
+    const populated = await Order.findById(acceptedOrder._id)
+      .populate("customer", "name email phone")
+      .populate("assignedTo", "name email phone");
+
     const io = req.app.get("io");
-    io.to(`customer:${acceptedOrder.customer}`).emit("orderAssigned", acceptedOrder);
-    io.to("admin").emit("orderAssigned", acceptedOrder);
+    io.to(`customer:${acceptedOrder.customer}`).emit("orderAssigned", populated);
+    io.to(`delivery:${acceptedOrder.assignedTo}`).emit("orderAssigned", populated); // IMPORTANT
+    io.to("admin").emit("orderAssigned", populated);
 
     return res.json({
       message: "Order accepted successfully",
-      order: acceptedOrder
+      order: populated
     });
 
   } catch (err) {
@@ -85,14 +90,17 @@ exports.updateOrderStatus = async (req, res) => {
     if (!updated)
       return res.status(404).json({ message: "Order not found or not assigned to you" });
 
-    // Notify customer + admin
+    const populated = await Order.findById(updated._id)
+      .populate("customer", "name email phone")
+      .populate("assignedTo", "name email phone");
+
     const io = req.app.get("io");
-    io.to(`customer:${updated.customer}`).emit("orderUpdated", updated);
-    io.to("admin").emit("orderUpdated", updated);
+    io.to(`customer:${updated.customer}`).emit("orderUpdated", populated);
+    io.to("admin").emit("orderUpdated", populated);
 
     return res.json({
       message: "Order status updated",
-      order: updated
+      order: populated
     });
 
   } catch (err) {
@@ -110,7 +118,8 @@ exports.getMyAssignedOrders = async (req, res) => {
 
     const orders = await Order.find({ assignedTo: deliveryId })
       .sort({ createdAt: -1 })
-      .populate("customer", "name phone");
+      .populate("customer", "name phone email")
+      .populate("assignedTo", "name phone email");
 
     res.json(orders);
 

@@ -5,7 +5,8 @@ const {
   getProductById,
   placeOrder,
   getMyOrders,
-  getOrderById
+  getOrderById,
+  cancelOrder
 } = require("../controllers/customerController");
 
 // Customer must be logged in
@@ -15,5 +16,6 @@ router.get("/products/:id", getProductById);
 router.post("/orders", auth, placeOrder);
 router.get("/orders", auth, getMyOrders);
 router.get("/orders/:id", auth, getOrderById);
+router.put("/orders/:id/cancel", auth, cancelOrder);
 
 module.exports = router;
