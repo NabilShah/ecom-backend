@@ -1,15 +1,7 @@
 const router = require("express").Router();
 const auth = require("../middleware/authMiddleware");
-const { 
-  getProducts,
-  getProductById,
-  placeOrder,
-  getMyOrders,
-  getOrderById,
-  cancelOrder
-} = require("../controllers/customerController");
+const { getProducts, getProductById, placeOrder, getMyOrders, getOrderById, cancelOrder } = require("../controllers/customerController");
 
-// Customer must be logged in
 router.get("/products", getProducts);
 router.get("/products/:id", getProductById);
 

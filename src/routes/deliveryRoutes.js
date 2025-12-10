@@ -2,14 +2,8 @@ const router = require("express").Router();
 const auth = require("../middleware/authMiddleware");
 const role = require("../middleware/roleMiddleware");
 
-const {
-  getUnassignedOrders,
-  acceptOrder,
-  updateOrderStatus,
-  getMyAssignedOrders
-} = require("../controllers/deliveryController");
+const { getUnassignedOrders, acceptOrder, updateOrderStatus, getMyAssignedOrders } = require("../controllers/deliveryController");
 
-// Only delivery partners can access these
 router.get("/unassigned", auth, role("delivery"), getUnassignedOrders);
 
 router.post("/accept/:orderId", auth, role("delivery"), acceptOrder);

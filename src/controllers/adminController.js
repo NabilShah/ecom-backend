@@ -2,20 +2,11 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
 
-// ------------------------------------
-// CREATE PRODUCT (Admin Only)
-// ------------------------------------
 exports.createProduct = async (req, res) => {
   try {
     const { name, description, price, images, stock } = req.body;
 
-    const product = await Product.create({
-      name,
-      description,
-      price,
-      images,
-      stock,
-    });
+    const product = await Product.create({ name, description, price, images, stock, });
 
     req.app.get("io").emit("productCreated", product);
 
@@ -29,9 +20,6 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// ------------------------------------
-// UPDATE PRODUCT (Admin Only)
-// ------------------------------------
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -43,7 +31,6 @@ exports.updateProduct = async (req, res) => {
 
     req.app.get("io").emit("productUpdated", updated);
 
-    // ALSO update stock UI live
     req.app.get("io").emit("stockUpdated", {
       productId: updated._id,
       stock: updated.stock,
@@ -59,9 +46,6 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// ------------------------------------
-// DELETE PRODUCT (Admin Only)
-// ------------------------------------
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -80,15 +64,9 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
-// =======================================================
-// GET ALL ORDERS (Admin Only)
-// =======================================================
 exports.getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find()
-      .populate("customer", "name email phone")
-      .populate("assignedTo", "name phone email")
-      .sort({ createdAt: -1 });
+    const orders = await Order.find().populate("customer", "name email phone").populate("assignedTo", "name phone email").sort({ createdAt: -1 });
 
     res.json(orders);
 
@@ -97,16 +75,11 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-// =======================================================
-// GET ORDER BY ID (Admin)
-// =======================================================
 exports.getOrderByIdAdmin = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findById(id)
-      .populate("customer", "name email phone")
-      .populate("assignedTo", "name phone");
+    const order = await Order.findById(id).populate("customer", "name email phone").populate("assignedTo", "name phone");
 
     if (!order)
       return res.status(404).json({ message: "Order not found" });
@@ -118,13 +91,9 @@ exports.getOrderByIdAdmin = async (req, res) => {
   }
 };
 
-// =======================================================
-// GET DELIVERY PARTNERS LIST
-// =======================================================
 exports.getDeliveryPartners = async (req, res) => {
   try {
-    const partners = await User.find({ role: "delivery" })
-      .select("name email phone isAvailable");
+    const partners = await User.find({ role: "delivery" }).select("name email phone isAvailable");
 
     res.json(partners);
 
@@ -133,9 +102,6 @@ exports.getDeliveryPartners = async (req, res) => {
   }
 };
 
-// =======================================================
-// GET LIVE ORDER STATUS COUNTS
-// =======================================================
 exports.getLiveStatuses = async (req, res) => {
   try {
     const counts = {

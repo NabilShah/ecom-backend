@@ -1,10 +1,6 @@
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 
-
-// -------------------------------
-// GET ALL PRODUCTS
-// -------------------------------
 exports.getProducts = async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
@@ -14,10 +10,6 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-
-// -------------------------------
-// GET PRODUCT BY ID
-// -------------------------------
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -30,10 +22,6 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-
-// -------------------------------
-// PLACE ORDER
-// -------------------------------
 exports.placeOrder = async (req, res) => {
   try {
     const customerId = req.user.id;
@@ -42,7 +30,6 @@ exports.placeOrder = async (req, res) => {
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Items cannot be empty" });
 
-    // 1️⃣ Validate stock & subtract
     let totalProductPrice = 0;
     let updatedProducts = [];
 
@@ -57,7 +44,6 @@ exports.placeOrder = async (req, res) => {
           message: `Not enough stock for ${product.name}, available: ${product.stock}`
         });
 
-      // subtract stock
       product.stock -= item.qty;
       await product.save();
 
@@ -66,34 +52,20 @@ exports.placeOrder = async (req, res) => {
       totalProductPrice += item.price * item.qty;
     }
 
-    // 2️⃣ Extra charges
     const deliveryCharge = 40;
     const tax = Number((totalProductPrice * 0.05).toFixed(2));
 
     const finalTotal = totalProductPrice + deliveryCharge + tax;
 
-    // 3️⃣ Create order
-    const order = await Order.create({
-      customer: customerId,
-      items,
-      total: finalTotal,
-      shipping,
-      paymentMethod,
-      status: "unassigned"
-    });
+    const order = await Order.create({ customer: customerId, items, total: finalTotal, shipping, paymentMethod, status: "unassigned" });
 
-    // 4️⃣ Emit to delivery partners
     const io = req.app.get("io");
 
-    // Populate before emitting so admin UI has full info
-    const populatedOrder = await Order.findById(order._id)
-      .populate("customer", "name email phone")
-      .populate("assignedTo", "name email phone");
+    const populatedOrder = await Order.findById(order._id).populate("customer", "name email phone").populate("assignedTo", "name email phone");
 
     io.to("delivery-available").emit("newOrder", populatedOrder);
     io.to("admin").emit("newOrder", populatedOrder);
 
-    // 5️⃣ Emit updated stock to ALL customers
     updatedProducts.forEach((product) => {
       io.emit("stockUpdated", {
         productId: product._id,
@@ -112,15 +84,9 @@ exports.placeOrder = async (req, res) => {
   }
 };
 
-
-// -------------------------------
-// GET CUSTOMER ORDERS
-// -------------------------------
 exports.getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ customer: req.user.id })
-      .populate("items.product", "name price")
-      .sort({ createdAt: -1 });
+    const orders = await Order.find({ customer: req.user.id }).populate("items.product", "name price").sort({ createdAt: -1 });
 
     res.json(orders);
 
@@ -129,18 +95,9 @@ exports.getMyOrders = async (req, res) => {
   }
 };
 
-
-// -------------------------------
-// GET ORDER BY ID
-// -------------------------------
 exports.getOrderById = async (req, res) => {
   try {
-    const order = await Order.findOne({
-      _id: req.params.id,
-      customer: req.user.id
-    })
-      .populate("items.product", "name price")
-      .populate("assignedTo", "name phone email");
+    const order = await Order.findOne({ _id: req.params.id, customer: req.user.id }).populate("items.product", "name price").populate("assignedTo", "name phone email");
 
     if (!order)
       return res.status(404).json({ message: "Order not found" });
@@ -151,56 +108,40 @@ exports.getOrderById = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-// -------------------------------
-// CANCEL ORDER
-// -------------------------------
+
 exports.cancelOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
 
-    // Find order
-    const order = await Order.findOne({
-      _id: orderId,
-      customer: req.user.id
-    }).populate("items.product");
+    const order = await Order.findOne({ _id: orderId, customer: req.user.id }).populate("items.product");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Only allow cancel if not delivered
     if (["delivered", "cancelled"].includes(order.status)) {
       return res.status(400).json({ message: "Order cannot be cancelled" });
     }
 
-    // Restore stock
     for (const item of order.items) {
       const product = await Product.findById(item.product._id);
       product.stock += item.qty;
       await product.save();
     }
 
-    // Update order status
     order.status = "cancelled";
     await order.save();
 
-    // Emit stock updated + order updated
     const io = req.app.get("io");
 
-    // Re-fetch populated for UI
-    const populated = await Order.findById(order._id)
-      .populate("customer", "name email phone")
-      .populate("assignedTo", "name email phone");
+    const populated = await Order.findById(order._id).populate("customer", "name email phone").populate("assignedTo", "name email phone");
 
-    // Notify customer
     io.to(`customer:${order.customer.toString()}`).emit("orderUpdated", populated);
 
-    // Notify admin
     io.to("admin").emit("orderUpdated", populated);
     io.to("delivery-available").emit("orderUpdated", populated);   // 👈 NEW
     io.emit("orderUpdated", populated);
 
-    // Stock updates
     order.items.forEach((item) => {
       io.emit("stockUpdated", {
         productId: item.product._id,
